@@ -3,12 +3,33 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
-    <title>WebAR Mô Hình Chim (GPS) - AR.js</title>
+    <title>WebAR Mô Hình Chim (GPS 100m) - AR.js</title>
     
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
+    
+    <style>
+      /* Thêm hiệu ứng thông báo khoảng cách cho người dùng dễ trải nghiệm */
+      #distance-hud {
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 10px 20px;
+        border-radius: 20px;
+        font-family: sans-serif;
+        font-size: 14px;
+        z-index: 999;
+        pointer-events: none;
+        text-align: center;
+      }
+    </style>
   </head>
   <body style="margin: 0px; overflow: hidden;">
+
+    <div id="distance-hud">Đang tính toán khoảng cách...</div>
     
     <a-scene 
       embedded 
@@ -21,20 +42,47 @@
       </a-assets>
       
       <a-entity 
+        id="ar-object"
         gps-entity-place="latitude: 10.421500; longitude: 105.643072;"
         position="0 0 0"
         scale="0.05 0.05 0.05"
-        rotation="0 0 0">
-        
-        <a-obj-model 
+        rotation="0 0 0"
+        visible="false"> <a-obj-model 
           src="#bird-obj" 
           mtl="#bird-mtl">
         </a-obj-model>
 
       </a-entity>
       
-      <a-entity camera gps-camera rotation-reader></a-entity>
+      <a-entity camera gps-camera="gpsMinDistance: 100; maxDistance: 100;" rotation-reader></a-entity>
       
     </a-scene>
+
+    <script>
+      // Lắng nghe sự kiện khi tọa độ GPS được tính toán xong
+      window.addEventListener('gps-camera-update-position', (e) => {
+        const arObject = document.getElementById('ar-object');
+        const hud = document.getElementById('distance-hud');
+        
+        // Lấy khoảng cách từ người dùng tới mô hình (tính bằng mét)
+        const distance = arObject.components['gps-entity-place'].distance;
+
+        if (distance !== undefined) {
+          // Làm tròn khoảng cách
+          const roundedDistance = Math.round(distance);
+          
+          // Kiểm tra nếu nằm trong bán kính 100m (chấp nhận sai số)
+          if (roundedDistance <= 100) {
+            arObject.setAttribute('visible', 'true');
+            hud.innerHTML = `Bạn đã vào vùng kích hoạt! Cách mục tiêu: ${roundedDistance}m`;
+            hud.style.background = "rgba(46, 204, 113, 0.8)"; // Màu xanh lá
+          } else {
+            arObject.setAttribute('visible', 'false');
+            hud.innerHTML = `Hãy di chuyển lại gần hơn. Cách mục tiêu: ${roundedDistance}m (Yêu cầu < 100m)`;
+            hud.style.background = "rgba(231, 76, 60, 0.8)"; // Màu đỏ
+          }
+        }
+      });
+    </script>
   </body>
 </html>
