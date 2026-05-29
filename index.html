@@ -9,7 +9,7 @@
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
     
     <style>
-      /* Thêm hiệu ứng thông báo khoảng cách cho người dùng dễ trải nghiệm */
+      /* Giao diện hiển thị khoảng cách */
       #distance-hud {
         position: fixed;
         bottom: 20px;
@@ -29,7 +29,7 @@
   </head>
   <body style="margin: 0px; overflow: hidden;">
 
-    <div id="distance-hud">Đang tính toán khoảng cách...</div>
+    <div id="distance-hud">Đang xác định vị trí GPS...</div>
     
     <a-scene 
       embedded 
@@ -43,11 +43,13 @@
       
       <a-entity 
         id="ar-object"
-        gps-entity-place="latitude: 10.421500; longitude: 105.643072;"
+        gps-entity-place="latitude: 0; longitude: 0;"
         position="0 0 0"
         scale="0.05 0.05 0.05"
         rotation="0 0 0"
-        visible="false"> <a-obj-model 
+        visible="false">
+        
+        <a-obj-model 
           src="#bird-obj" 
           mtl="#bird-mtl">
         </a-obj-model>
@@ -59,27 +61,30 @@
     </a-scene>
 
     <script>
-      // Lắng nghe sự kiện khi tọa độ GPS được tính toán xong
+      // Đã cập nhật tọa độ mới của bạn vào đây
+      const VI_DO = 10.4212398;  
+      const KINH_DO = 105.6433481; 
+
+      // Gán tọa độ vào thực thể AR
+      const arObject = document.getElementById('ar-object');
+      arObject.setAttribute('gps-entity-place', `latitude: ${VI_DO}; longitude: ${KINH_DO};`);
+
+      // Xử lý logic hiển thị dựa trên bán kính 100m
       window.addEventListener('gps-camera-update-position', (e) => {
-        const arObject = document.getElementById('ar-object');
-        const hud = document.getElementById('distance-hud');
-        
-        // Lấy khoảng cách từ người dùng tới mô hình (tính bằng mét)
+        const sampleHud = document.getElementById('distance-hud');
         const distance = arObject.components['gps-entity-place'].distance;
 
         if (distance !== undefined) {
-          // Làm tròn khoảng cách
           const roundedDistance = Math.round(distance);
           
-          // Kiểm tra nếu nằm trong bán kính 100m (chấp nhận sai số)
           if (roundedDistance <= 100) {
             arObject.setAttribute('visible', 'true');
-            hud.innerHTML = `Bạn đã vào vùng kích hoạt! Cách mục tiêu: ${roundedDistance}m`;
-            hud.style.background = "rgba(46, 204, 113, 0.8)"; // Màu xanh lá
+            sampleHud.innerHTML = `Đã vào vùng kích hoạt 100m! Cách mục tiêu: ${roundedDistance}m`;
+            sampleHud.style.background = "rgba(46, 204, 113, 0.8)"; // Màu xanh khi hợp lệ
           } else {
             arObject.setAttribute('visible', 'false');
-            hud.innerHTML = `Hãy di chuyển lại gần hơn. Cách mục tiêu: ${roundedDistance}m (Yêu cầu < 100m)`;
-            hud.style.background = "rgba(231, 76, 60, 0.8)"; // Màu đỏ
+            sampleHud.innerHTML = `Hãy lại gần hơn. Cách mục tiêu: ${roundedDistance}m (Yêu cầu < 100m)`;
+            sampleHud.style.background = "rgba(231, 76, 60, 0.8)"; // Màu đỏ khi ở quá xa
           }
         }
       });
