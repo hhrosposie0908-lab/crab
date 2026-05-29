@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>WebAR Mô Hình Chim (GPS 100m)</title>
+    <title>WebAR Mô Hình Chim (Sửa lỗi iOS)</title>
     
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
@@ -15,11 +15,18 @@
         border-radius: 20px; font-family: sans-serif; font-size: 14px;
         z-index: 999; text-align: center; width: 80%; max-width: 300px;
       }
+      #start-btn {
+        position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        padding: 15px 30px; background: #2ecc71; color: white; border: none;
+        border-radius: 10px; font-size: 16px; font-weight: bold; z-index: 1000;
+        cursor: pointer; box-shadow: 0px 4px 10px rgba(0,0,0,0.3);
+      }
     </style>
   </head>
   <body style="margin: 0px; overflow: hidden;">
 
-    <div id="distance-hud">Đang yêu cầu quyền truy cập GPS...</div>
+    <button id="start-btn" onclick="initGPS()">BẮT ĐẦU ỨNG DỤNG AR</button>
+    <div id="distance-hud" style="display: none;">Đang kết nối GPS vệ tinh...</div>
     
     <a-scene 
       embedded 
@@ -38,48 +45,71 @@
         scale="0.25 0.25 0.25"
         rotation="0 0 0"
         visible="false">
-        
         <a-obj-model src="#bird-obj" mtl="#bird-mtl"></a-obj-model>
       </a-entity>
       
-      <a-entity camera gps-camera="gpsMinDistance: 1; maxDistance: 100;" rotation-reader></a-entity>
+      <a-entity id="main-camera" camera gps-camera="gpsMinDistance: 1; maxDistance: 100;" rotation-reader></a-entity>
       
     </a-scene>
 
     <script>
       const arObject = document.getElementById('ar-object');
       const hud = document.getElementById('distance-hud');
+      const startBtn = document.getElementById('start-btn');
+      const cameraEl = document.getElementById('main-camera');
+      let gpsSuccess = false;
 
-      // Lắng nghe sự kiện ngay khi camera nhận tín hiệu GPS đầu tiên
+      function initGPS() {
+        startBtn.style.display = 'none';
+        hud.style.display = 'block';
+
+        // Cố gắng gọi GPS thật của máy
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            gpsSuccess = true;
+            hud.innerHTML = "Đã nhận GPS thật! Đang tính khoảng cách...";
+          },
+          (err) => {
+            console.log("Lỗi định vị thực tế, chuyển sang chế độ kích hoạt khẩn cấp.");
+          },
+          { enableHighAccuracy: true, timeout: 6000 }
+        );
+
+        // BỘ CỨU NGUY: Sau 7 giây nếu iOS vẫn chặn GPS, tự động kích hoạt mô hình trước mặt bạn luôn
+        setTimeout(() => {
+          if (!gpsSuccess) {
+            hud.innerHTML = "iOS chặn GPS! Đã tự động kích hoạt mô hình cách bạn 15m";
+            hud.style.background = "rgba(230, 126, 34, 0.9)"; // Màu cam cảnh báo bảo mật
+            
+            // Xóa bỏ thuộc tính GPS bị kẹt
+            arObject.removeAttribute('gps-entity-place');
+            cameraEl.removeAttribute('gps-camera');
+            
+            // Đặt mô hình ngay trước mắt camera (trục Z âm là phía trước mặt)
+            arObject.setAttribute('position', '0 0 -15'); 
+            arObject.setAttribute('visible', 'true');
+          }
+        }, 7000);
+      }
+
+      // Xử lý khi GPS thật hoạt động ổn định
       window.addEventListener('gps-camera-update-position', (e) => {
-        // Dự phòng nếu hệ thống chưa kịp tính khoảng cách tự động
+        gpsSuccess = true;
         const distance = arObject.components['gps-entity-place'] ? arObject.components['gps-entity-place'].distance : null;
 
         if (distance !== null && distance !== undefined) {
           const roundedDistance = Math.round(distance);
-          
           if (roundedDistance <= 100) {
             arObject.setAttribute('visible', 'true');
-            hud.innerHTML = `Đã kích hoạt! Cách mục tiêu: ${roundedDistance}m`;
+            hud.innerHTML = `Đã kết nối GPS! Cách mục tiêu: ${roundedDistance}m`;
             hud.style.background = "rgba(46, 204, 113, 0.9)";
           } else {
             arObject.setAttribute('visible', 'false');
-            hud.innerHTML = `Mục tiêu ở xa: ${roundedDistance}m (Hãy lại gần < 100m)`;
+            hud.innerHTML = `Mục tiêu cách bạn: ${roundedDistance}m (Hãy lại gần < 100m)`;
             hud.style.background = "rgba(231, 76, 60, 0.9)";
           }
-        } else {
-          hud.innerHTML = "Đã nhận GPS. Đang tính khoảng cách...";
         }
       });
-
-      // Tự động kiểm tra nếu trình duyệt từ chối quyền định vị
-      navigator.geolocation.getCurrentPosition(
-        () => {}, 
-        (err) => {
-          hud.innerHTML = "Lỗi: Trình duyệt bị chặn quyền truy cập GPS!";
-          hud.style.background = "red";
-        }
-      );
     </script>
   </body>
 </html>
