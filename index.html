@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>WebAR Mô Hình Chim (Sửa lỗi iOS)</title>
+    <title>WebAR Mô Hình Chim (GPS Chuẩn)</title>
     
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
@@ -25,8 +25,8 @@
   </head>
   <body style="margin: 0px; overflow: hidden;">
 
-    <button id="start-btn" onclick="initGPS()">BẮT ĐẦU ỨNG DỤNG AR</button>
-    <div id="distance-hud" style="display: none;">Đang kết nối GPS vệ tinh...</div>
+    <button id="start-btn" onclick="initGPS()">BẮT ĐẦU KẾT NỐI GPS</button>
+    <div id="distance-hud" style="display: none;">Đang dò tín hiệu vệ tinh GPS...</div>
     
     <a-scene 
       embedded 
@@ -48,7 +48,7 @@
         <a-obj-model src="#bird-obj" mtl="#bird-mtl"></a-obj-model>
       </a-entity>
       
-      <a-entity id="main-camera" camera gps-camera="gpsMinDistance: 1; maxDistance: 100;" rotation-reader></a-entity>
+      <a-entity camera gps-camera="gpsMinDistance: 1; maxDistance: 100;" rotation-reader></a-entity>
       
     </a-scene>
 
@@ -56,57 +56,42 @@
       const arObject = document.getElementById('ar-object');
       const hud = document.getElementById('distance-hud');
       const startBtn = document.getElementById('start-btn');
-      const cameraEl = document.getElementById('main-camera');
-      let gpsSuccess = false;
 
       function initGPS() {
         startBtn.style.display = 'none';
         hud.style.display = 'block';
 
-        // Cố gắng gọi GPS thật của máy
-        navigator.geolocation.getCurrentPosition(
+        // Ép hệ thống xin quyền và theo dõi tọa độ thời gian thực
+        navigator.geolocation.watchPosition(
           (position) => {
-            gpsSuccess = true;
+            // Khi nhận được GPS thật, dòng chữ sẽ đổi sang màu xanh dương
             hud.innerHTML = "Đã nhận GPS thật! Đang tính khoảng cách...";
+            hud.style.background = "#3498db";
           },
           (err) => {
-            console.log("Lỗi định vị thực tế, chuyển sang chế độ kích hoạt khẩn cấp.");
+            // Nếu vẫn bị chặn quyền hệ thống
+            hud.innerHTML = `Lỗi GPS số ${err.code}: Vui lòng bấm mở bằng Safari ngoài và bật Vị trí chính xác trong Cài đặt máy!`;
+            hud.style.background = "rgba(231, 76, 60, 0.9)";
           },
-          { enableHighAccuracy: true, timeout: 6000 }
+          { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
         );
-
-        // BỘ CỨU NGUY: Sau 7 giây nếu iOS vẫn chặn GPS, tự động kích hoạt mô hình trước mặt bạn luôn
-        setTimeout(() => {
-          if (!gpsSuccess) {
-            hud.innerHTML = "iOS chặn GPS! Đã tự động kích hoạt mô hình cách bạn 15m";
-            hud.style.background = "rgba(230, 126, 34, 0.9)"; // Màu cam cảnh báo bảo mật
-            
-            // Xóa bỏ thuộc tính GPS bị kẹt
-            arObject.removeAttribute('gps-entity-place');
-            cameraEl.removeAttribute('gps-camera');
-            
-            // Đặt mô hình ngay trước mắt camera (trục Z âm là phía trước mặt)
-            arObject.setAttribute('position', '0 0 -15'); 
-            arObject.setAttribute('visible', 'true');
-          }
-        }, 7000);
       }
 
-      // Xử lý khi GPS thật hoạt động ổn định
+      // Nhận tín hiệu khoảng cách từ AR.js gửi về
       window.addEventListener('gps-camera-update-position', (e) => {
-        gpsSuccess = true;
         const distance = arObject.components['gps-entity-place'] ? arObject.components['gps-entity-place'].distance : null;
 
         if (distance !== null && distance !== undefined) {
           const roundedDistance = Math.round(distance);
+          
           if (roundedDistance <= 100) {
             arObject.setAttribute('visible', 'true');
-            hud.innerHTML = `Đã kết nối GPS! Cách mục tiêu: ${roundedDistance}m`;
-            hud.style.background = "rgba(46, 204, 113, 0.9)";
+            hud.innerHTML = `Đã vào vùng kích hoạt! Cách con cua: ${roundedDistance}m`;
+            hud.style.background = "rgba(46, 204, 113, 0.9)"; // Màu xanh lá khi thành công
           } else {
             arObject.setAttribute('visible', 'false');
-            hud.innerHTML = `Mục tiêu cách bạn: ${roundedDistance}m (Hãy lại gần < 100m)`;
-            hud.style.background = "rgba(231, 76, 60, 0.9)";
+            hud.innerHTML = `Con cua ở xa: ${roundedDistance}m (Hãy đi lại gần < 100m)`;
+            hud.style.background = "rgba(231, 76, 60, 0.9)"; // Màu đỏ khi quá xa
           }
         }
       });
